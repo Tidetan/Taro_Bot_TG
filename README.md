@@ -1,9 +1,5 @@
 # Master AI BOT: Fastest Telegram AI BOT. Voice Support. GPT-4 Turbo. Unique Chat Modes
 
-<p align="center">
-  <img src="https://pub-f858c7e521464395920779af297fb1bd.r2.dev/Master.gif" align="center" style="width: 100%; border-radius: 20px" />
-</p>
-
 Unleash the power of ChatGPT with our Telegram Bot! Say goodbye to the laggy experience of chat.openai.com, daily usage limits, and outdated web interfaces.
 
 You can deploy your own bot or use our streamlined version: [Click Here](https://t.me/Master_AI_YESBHAUTIK_BOT)
@@ -23,15 +19,9 @@ You can deploy your own bot or use our streamlined version: [Click Here](https:/
 - Control access with a list of authorized Telegram users
 - Keep track of your OpenAI API spending
 
-<p align="center">
-  <img src="https://github.com/yesbhautik/Master-AI-BOT/blob/main/static/help_group.gif?raw=true" style="width: 40%; border-radius: 20px"/>
-</p>
 
 ---
 
-## 🔴 Get LLMs official API at affordable price
-
-Give a ping on [Telegram](https://t.me/yesbhautik) | [WhatsApp](https://wa.me/+916353586391)
 
 ## Bot Commands
 
@@ -106,22 +96,5 @@ If you find this repository helpful, please show your support by giving it a ⭐
 
 Additionally, if you'd like to offer financial support, you can do so via our donation link: [Make a Donation](https://rzp.io/l/Contribute-to-YesbhautikX-USD)
 
-<br>
-<a href="https://rzp.io/l/Contribute-to-YesbhautikX-USD">
-  <img src="https://www.pngall.com/wp-content/uploads/2016/05/PayPal-Donate-Button-Free-Download-PNG.png" alt="Donate" width="100">
-</a>
 
-## 💬 Let's Connect
 
-Feel free to reach out to us if you have questions, ideas, or simply want to chat. We're here to help and connect with the community.
-
-- Website: [https://yesbhautik.co.in/](https://yesbhautik.co.in/)
-- Another One: [https://yesbhautikx.co.in/](https://yesbhautikx.co.in/)
-- LinkedIn profile: [https://www.linkedin.com/in/yesbhautik](https://www.linkedin.com/in/yesbhautik)
-- Instagram page: [https://www.instagram.com/yesbhautik](https://www.instagram.com/yesbhautik)
-
-## 📜 License
-
-This repository is licensed under the MIT License. For more information, see the [LICENSE](LICENSE) file.
-
-Transforming your `readme.md` into an attractive, user-friendly guide is crucial for engaging your audience and making a lasting impression. If you have any further requests or need assistance with anything else, feel free to ask.
