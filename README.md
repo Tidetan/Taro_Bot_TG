@@ -1,9 +1,3 @@
-# Master AI BOT: Fastest Telegram AI BOT. Voice Support. GPT-4 Turbo. Unique Chat Modes
-
-Unleash the power of ChatGPT with our Telegram Bot! Say goodbye to the laggy experience of chat.openai.com, daily usage limits, and outdated web interfaces.
-
-You can deploy your own bot or use our streamlined version: [Click Here](https://t.me/Master_AI_YESBHAUTIK_BOT)
-
 ## Key Features
 
 - Lightning-fast responses (typically within 3-5 seconds)
@@ -90,11 +84,6 @@ Contributions are welcome! Please follow these steps to contribute to the projec
 4. Push your changes to your fork 🚀
 5. Create a pull request to the main repository 📥
 
-## 🔥 Show Your Support | Make a Donation
-
-If you find this repository helpful, please show your support by giving it a ⭐! Your support means a lot to us and encourages us to contribute more to the open-source community.
-
-Additionally, if you'd like to offer financial support, you can do so via our donation link: [Make a Donation](https://rzp.io/l/Contribute-to-YesbhautikX-USD)
 
 
 
