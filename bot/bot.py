@@ -42,7 +42,7 @@ user_tasks = {}
 HELP_MESSAGE = """Commands:
 ⚪ /retry – Regenerate last bot answer
 ⚪ /new – Start new dialog
-⚪ /mode – Select chat mode
+⚪ /mode – Select chat modo
 ⚪ /settings – Show settings
 ⚪ /balance – Show balance
 ⚪ /help – Show help
@@ -346,7 +346,9 @@ async def tarot_handle(update: Update, context: CallbackContext, message: str):
 
     tarot_query = f"Предсказание на картах Таро для запроса: {message}"
 
-    chatgpt_instance = openai_utils.ChatGPT(model="tarot-forecaster")
+    current_model = db.get_user_attribute(user_id, "current_model")
+    chatgpt_instance = openai_utils.ChatGPT(model=current_model)
+    
     answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed = await chatgpt_instance.send_message(
         tarot_query,
         dialog_messages=db.get_dialog_messages(user_id, dialog_id=None),
@@ -360,7 +362,7 @@ async def tarot_handle(update: Update, context: CallbackContext, message: str):
         dialog_id=None
     )
 
-    db.update_n_used_tokens(user_id, "tarot-forecaster", n_input_tokens, n_output_tokens)
+    db.update_n_used_tokens(user_id, current_model, n_input_tokens, n_output_tokens)
 
     await update.message.reply_text(answer, parse_mode=ParseMode.HTML)
 
@@ -449,7 +451,7 @@ async def new_dialog_handle(update: Update, context: CallbackContext):
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
     db.start_new_dialog(user_id)
-    await update.message.reply_text("Starting new dialog ✅")
+    await update.message.reply_text("Starting new dialogo ✅")
 
     chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
     await update.message.reply_text(f"{config.chat_modes[chat_mode]['welcome_message']}", parse_mode=ParseMode.HTML)
@@ -707,7 +709,7 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 async def post_init(application: Application):
     await application.bot.set_my_commands([
         BotCommand("/new", "Start new dialog"),
-        BotCommand("/mode", "Select chat mode"),
+        BotCommand("/mode", "Select chat modo"),
         BotCommand("/retry", "Re-generate response for previous query"),
         BotCommand("/balance", "Show balance"),
         BotCommand("/settings", "Show settings"),
