@@ -69,10 +69,13 @@ Powered by YesbhautikX 🚀
 """
 
 
-def split_text_into_chunks(text, chunk_size):
+#Важно разбивает текст на чанки
+
+def split_text_into_chunks(text, chunk_size): 
     for i in range(0, len(text), chunk_size):
         yield text[i:i + chunk_size]
 
+#Важно регестрирует нового пользователя если он существует
 
 async def register_user_if_not_exists(update: Update, context: CallbackContext, user: User):
     if not db.check_if_user_exists(user.id):
@@ -114,6 +117,9 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
         db.set_user_attribute(user.id, "n_generated_images", 0)
 
 
+
+# Проверяет, упоминался ли бот в сообщении 
+
 async def is_bot_mentioned(update: Update, context: CallbackContext):
      try:
          message = update.message
@@ -132,6 +138,7 @@ async def is_bot_mentioned(update: Update, context: CallbackContext):
      else:
          return False
 
+# Обрабатывает команду /start
 
 async def start_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -146,6 +153,7 @@ async def start_handle(update: Update, context: CallbackContext):
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
     await show_chat_modes_handle(update, context)
 
+# Обрабатывает команду /help
 
 async def help_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -153,6 +161,7 @@ async def help_handle(update: Update, context: CallbackContext):
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
     await update.message.reply_text(HELP_MESSAGE, parse_mode=ParseMode.HTML)
 
+# Обрабатывает команду /help_group_chat
 
 async def help_group_chat_handle(update: Update, context: CallbackContext):
      await register_user_if_not_exists(update, context, update.message.from_user)
@@ -164,6 +173,7 @@ async def help_group_chat_handle(update: Update, context: CallbackContext):
      await update.message.reply_text(text, parse_mode=ParseMode.HTML)
      await update.message.reply_video(config.help_group_chat_video_path)
 
+# Обрабатывает команду /retry
 
 async def retry_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -182,6 +192,7 @@ async def retry_handle(update: Update, context: CallbackContext):
 
     await message_handle(update, context, message=last_dialog_message["user"], use_new_dialog_timeout=False)
 
+# Обрабатывает входящие сообщения.
 
 async def message_handle(update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True):
     # check if bot was mentioned (for group chats)
@@ -318,6 +329,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             if user_id in user_tasks:
                 del user_tasks[user_id]
 
+# Проверяет, не осталось ли необработанных сообщений от пользователя.
 
 async def is_previous_message_not_answered_yet(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -331,6 +343,7 @@ async def is_previous_message_not_answered_yet(update: Update, context: Callback
     else:
         return False
 
+# Обрабатывает голосовые сообщения
 
 async def voice_message_handle(update: Update, context: CallbackContext):
     # check if bot was mentioned (for group chats)
@@ -361,6 +374,7 @@ async def voice_message_handle(update: Update, context: CallbackContext):
 
     await message_handle(update, context, message=transcribed_text)
 
+#Генерирует изображения на основе текстовых сообщений.
 
 async def generate_image_handle(update: Update, context: CallbackContext, message=None):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -390,6 +404,7 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
         await update.message.chat.send_action(action="upload_photo")
         await update.message.reply_photo(image_url, parse_mode=ParseMode.HTML)
 
+# Начинает новый диалог
 
 async def new_dialog_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -404,6 +419,7 @@ async def new_dialog_handle(update: Update, context: CallbackContext):
     chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
     await update.message.reply_text(f"{config.chat_modes[chat_mode]['welcome_message']}", parse_mode=ParseMode.HTML)
 
+# Отменяет текущую задачу
 
 async def cancel_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -417,6 +433,7 @@ async def cancel_handle(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("<i>Nothing to cancel...</i>", parse_mode=ParseMode.HTML)
 
+# Создает меню выбора режима чата
 
 def get_chat_mode_menu(page_index: int):
     n_chat_modes_per_page = config.n_chat_modes_per_page
@@ -454,6 +471,7 @@ def get_chat_mode_menu(page_index: int):
 
     return text, reply_markup
 
+# Показывает меню выбора режима чата
 
 async def show_chat_modes_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -465,6 +483,7 @@ async def show_chat_modes_handle(update: Update, context: CallbackContext):
     text, reply_markup = get_chat_mode_menu(0)
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
+# Обрабатывает выбор режима чата
 
 async def show_chat_modes_callback_handle(update: Update, context: CallbackContext):
      await register_user_if_not_exists(update.callback_query, context, update.callback_query.from_user)
@@ -487,6 +506,7 @@ async def show_chat_modes_callback_handle(update: Update, context: CallbackConte
          if str(e).startswith("Message is not modified"):
              pass
 
+# Устанавливает выбранный режим чата
 
 async def set_chat_mode_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update.callback_query, context, update.callback_query.from_user)
@@ -506,6 +526,7 @@ async def set_chat_mode_handle(update: Update, context: CallbackContext):
         parse_mode=ParseMode.HTML
     )
 
+# Создает меню настроек
 
 def get_settings_menu(user_id: int):
     current_model = db.get_user_attribute(user_id, "current_model")
@@ -532,6 +553,7 @@ def get_settings_menu(user_id: int):
 
     return text, reply_markup
 
+# Показывает меню настроек
 
 async def settings_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -543,6 +565,7 @@ async def settings_handle(update: Update, context: CallbackContext):
     text, reply_markup = get_settings_menu(user_id)
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
+# Обрабатывает выбор модели в настройках.
 
 async def set_settings_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update.callback_query, context, update.callback_query.from_user)
@@ -562,6 +585,7 @@ async def set_settings_handle(update: Update, context: CallbackContext):
         if str(e).startswith("Message is not modified"):
             pass
 
+# Показывает баланс пользователя
 
 async def show_balance_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -609,12 +633,14 @@ async def show_balance_handle(update: Update, context: CallbackContext):
 
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
+# Обрабатывает отредактированные сообщения
 
 async def edited_message_handle(update: Update, context: CallbackContext):
     if update.edited_message.chat.type == "private":
         text = "🥲 Unfortunately, message <b>editing</b> is not supported"
         await update.edited_message.reply_text(text, parse_mode=ParseMode.HTML)
 
+# Обрабатывает ошибки
 
 async def error_handle(update: Update, context: CallbackContext) -> None:
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
@@ -641,6 +667,8 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
     except:
         await context.bot.send_message(update.effective_chat.id, "Some error in error handler")
 
+# Устанавливает команды бота после его инициализации
+
 async def post_init(application: Application):
     await application.bot.set_my_commands([
         BotCommand("/new", "Start new dialog"),
@@ -650,6 +678,8 @@ async def post_init(application: Application):
         BotCommand("/settings", "Show settings"),
         BotCommand("/help", "Show help message"),
     ])
+
+# Запускает бота
 
 def run_bot() -> None:
     application = (
