@@ -75,7 +75,7 @@ def split_text_into_chunks(text, chunk_size):
     for i in range(0, len(text), chunk_size):
         yield text[i:i + chunk_size]
 
-#Важно регестрирует нового пользователя если он существует
+#Важно регистрирует нового пользователя если он существует
 
 async def register_user_if_not_exists(update: Update, context: CallbackContext, user: User):
     if not db.check_if_user_exists(user.id):
@@ -96,6 +96,10 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
 
     if db.get_user_attribute(user.id, "current_model") is None:
         db.set_user_attribute(user.id, "current_model", config.models["available_text_models"][0])
+
+        # Set default chat mode to tarot_forecaster
+    if db.get_user_attribute(user.id, "current_chat_mode") is None:
+        db.set_user_attribute(user.id, "current_chat_mode", "tarot_forecaster")
 
     # back compatibility for n_used_tokens field
     n_used_tokens = db.get_user_attribute(user.id, "n_used_tokens")
@@ -219,13 +223,19 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
     if chat_mode == "artist":
         await generate_image_handle(update, context, message=message)
         return
+    
+    if chat_mode == "tarot_forecaster":
+        await tarot_handle(update, context, message=message)
+        return
 
     async def message_handle_fn():
         # new dialog timeout
         if use_new_dialog_timeout:
             if (datetime.now() - db.get_user_attribute(user_id, "last_interaction")).seconds > config.new_dialog_timeout and len(db.get_dialog_messages(user_id)) > 0:
                 db.start_new_dialog(user_id)
-                await update.message.reply_text(f"Starting new dialog due to timeout (<b>{config.chat_modes[chat_mode]['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
+                # Set chat mode to tarot_forecaster for new dialog
+                db.set_user_attribute(user_id, "current_chat_mode", "tarot_forecaster")
+                await update.message.reply_text(f"Starting new dialog due to timeoutsa (<b>{config.chat_modes[chat_mode]['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
         db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
         # in case of CancelledError
@@ -328,6 +338,31 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
         finally:
             if user_id in user_tasks:
                 del user_tasks[user_id]
+
+# Функция tarot_handle
+
+async def tarot_handle(update: Update, context: CallbackContext, message: str):
+    user_id = update.message.from_user.id
+
+    tarot_query = f"Предсказание на картах Таро для запроса: {message}"
+
+    chatgpt_instance = openai_utils.ChatGPT(model="tarot-forecaster")
+    answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed = await chatgpt_instance.send_message(
+        tarot_query,
+        dialog_messages=db.get_dialog_messages(user_id, dialog_id=None),
+        chat_mode="tarot_forecaster"
+    )
+
+    new_dialog_message = {"user": message, "bot": answer, "date": datetime.now()}
+    db.set_dialog_messages(
+        user_id,
+        db.get_dialog_messages(user_id, dialog_id=None) + [new_dialog_message],
+        dialog_id=None
+    )
+
+    db.update_n_used_tokens(user_id, "tarot-forecaster", n_input_tokens, n_output_tokens)
+
+    await update.message.reply_text(answer, parse_mode=ParseMode.HTML)
 
 # Проверяет, не осталось ли необработанных сообщений от пользователя.
 

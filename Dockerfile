@@ -16,8 +16,10 @@ RUN pip3 install -U pip && pip3 install -U wheel && pip3 install -U setuptools==
 COPY ./requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt && rm -r /tmp/requirements.txt
 
+RUN pip3 install watchdog
+
 COPY . /code
 WORKDIR /code
 
-CMD ["bash"]
+CMD ["watchmedo", "auto-restart", "--directory=./bot", "--pattern=*.py", "--recursive", "python3", "bot/bot.py"]
 
