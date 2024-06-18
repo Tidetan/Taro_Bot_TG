@@ -38,3 +38,14 @@ services:
       - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD:-password}
     depends_on:
       - mongo
+  
+  test:
+    container_name: chatgpt_telegram_bot_test
+    build:
+      context: "."
+      dockerfile: Dockerfile
+    command: ["pytest", "test_message_handle.py"]
+    volumes:
+      - .:/code
+    depends_on:
+      - mongo

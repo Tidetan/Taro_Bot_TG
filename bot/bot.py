@@ -42,30 +42,11 @@ user_tasks = {}
 HELP_MESSAGE = """Commands:
 ⚪ /retry – Regenerate last bot answer
 ⚪ /new – Start new dialog
-⚪ /mode – Select chat modo
-⚪ /settings – Show settings
 ⚪ /balance – Show balance
 ⚪ /help – Show help
 
-🎨 Generate images from text prompts in <b>👩‍🎨 Artist</b> /mode
-👥 Add bot to <b>group chat</b>: /help_group_chat
 🎤 You can send <b>Voice Messages</b> instead of text
 
-For more @yesbhautik
-Powered by YesbhautikX 🚀
-"""
-
-HELP_GROUP_CHAT_MESSAGE = """You can add bot to any <b>group chat</b> to help and entertain its participants!
-
-Instructions (see <b>video</b> below):
-1. Add the bot to the group chat
-2. Make it an <b>admin</b>, so that it can see messages (all other rights can be restricted)
-3. You're awesome!
-
-To get a reply from the bot in the chat – @ <b>tag</b> it or <b>reply</b> to its message.
-For example: "{bot_username} write a poem about Telegram"
-
-Powered by YesbhautikX 🚀
 """
 
 
@@ -151,11 +132,10 @@ async def start_handle(update: Update, context: CallbackContext):
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
     db.start_new_dialog(user_id)
 
-    reply_text = "Hi! I'm <b>ChatGPT</b> bot implemented with OpenAI API 🤖\n\n"
+    reply_text = "Привет! Я <b>PocketTaro</b> бот реализованный с помощью OpenAI 🃏\n\n"
     reply_text += HELP_MESSAGE
 
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
-    await show_chat_modes_handle(update, context)
 
 # Обрабатывает команду /help
 
@@ -165,17 +145,6 @@ async def help_handle(update: Update, context: CallbackContext):
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
     await update.message.reply_text(HELP_MESSAGE, parse_mode=ParseMode.HTML)
 
-# Обрабатывает команду /help_group_chat
-
-async def help_group_chat_handle(update: Update, context: CallbackContext):
-     await register_user_if_not_exists(update, context, update.message.from_user)
-     user_id = update.message.from_user.id
-     db.set_user_attribute(user_id, "last_interaction", datetime.now())
-
-     text = HELP_GROUP_CHAT_MESSAGE.format(bot_username="@" + context.bot.username)
-
-     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
-     await update.message.reply_video(config.help_group_chat_video_path)
 
 # Обрабатывает команду /retry
 
@@ -199,74 +168,68 @@ async def retry_handle(update: Update, context: CallbackContext):
 # Обрабатывает входящие сообщения.
 
 async def message_handle(update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True):
-    # check if bot was mentioned (for group chats)
+    # Проверка, упомянут ли бот (для групповых чатов)
     if not await is_bot_mentioned(update, context):
         return
 
-    # check if message is edited
+    # Проверка, было ли сообщение отредактировано
     if update.edited_message is not None:
         await edited_message_handle(update, context)
         return
 
     _message = message or update.message.text
 
-    # remove bot mention (in group chats)
+    # Удаление упоминания бота (в групповых чатах)
     if update.message.chat.type != "private":
         _message = _message.replace("@" + context.bot.username, "").strip()
 
+    # Регистрация пользователя и проверка предыдущих сообщений
     await register_user_if_not_exists(update, context, update.message.from_user)
-    if await is_previous_message_not_answered_yet(update, context): return
+    if await is_previous_message_not_answered_yet(update, context):
+        return
 
     user_id = update.message.from_user.id
-    chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
 
-    if chat_mode == "artist":
-        await generate_image_handle(update, context, message=message)
-        return
-    
-    if chat_mode == "tarot_forecaster":
-        await tarot_handle(update, context, message=message)
-        return
-
+    # Обработка режима чата "tarot_forecaster"
     async def message_handle_fn():
-        # new dialog timeout
+        # Новый диалог по таймауту
         if use_new_dialog_timeout:
             if (datetime.now() - db.get_user_attribute(user_id, "last_interaction")).seconds > config.new_dialog_timeout and len(db.get_dialog_messages(user_id)) > 0:
                 db.start_new_dialog(user_id)
-                # Set chat mode to tarot_forecaster for new dialog
-                db.set_user_attribute(user_id, "current_chat_mode", "tarot_forecaster")
-                await update.message.reply_text(f"Starting new dialog due to timeoutsa (<b>{config.chat_modes[chat_mode]['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
+                await update.message.reply_text(f"Starting new dialog due to timeout (<b>{config.chat_modes['tarot_forecaster']['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
         db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
-        # in case of CancelledError
+        # В случае ошибки CancelledError
         n_input_tokens, n_output_tokens = 0, 0
         current_model = db.get_user_attribute(user_id, "current_model")
 
         try:
-            # send placeholder message to user
+            # Отправка временного сообщения пользователю
             placeholder_message = await update.message.reply_text("...")
 
-            # send typing action
+            # Отправка действия "typing"
             await update.message.chat.send_action(action="typing")
 
             if _message is None or len(_message) == 0:
-                 await update.message.reply_text("🥲 You sent <b>empty message</b>. Please, try again!", parse_mode=ParseMode.HTML)
-                 return
+                await update.message.reply_text("🥲 You sent <b>empty message</b>. Please, try again!", parse_mode=ParseMode.HTML)
+                return
 
             dialog_messages = db.get_dialog_messages(user_id, dialog_id=None)
             parse_mode = {
                 "html": ParseMode.HTML,
                 "markdown": ParseMode.MARKDOWN
-            }[config.chat_modes[chat_mode]["parse_mode"]]
+            }[config.chat_modes['tarot_forecaster']['parse_mode']]
 
             chatgpt_instance = openai_utils.ChatGPT(model=current_model)
+            tarot_query = f"Предсказание на картах Таро для запроса: {_message}"
+
             if config.enable_message_streaming:
-                gen = chatgpt_instance.send_message_stream(_message, dialog_messages=dialog_messages, chat_mode=chat_mode)
+                gen = chatgpt_instance.send_message_stream(tarot_query, dialog_messages=dialog_messages, chat_mode="tarot_forecaster")
             else:
                 answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed = await chatgpt_instance.send_message(
-                    _message,
+                    tarot_query,
                     dialog_messages=dialog_messages,
-                    chat_mode=chat_mode
+                    chat_mode="tarot_forecaster"
                 )
 
                 async def fake_gen():
@@ -278,9 +241,9 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             async for gen_item in gen:
                 status, answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed = gen_item
 
-                answer = answer[:4096]  # telegram message limit
+                answer = answer[:4096]  # Лимит сообщения в Telegram
 
-                # update only when 100 new symbols are ready
+                # Обновление только при готовности 100 новых символов
                 if abs(len(answer) - len(prev_answer)) < 100 and status != "finished":
                     continue
 
@@ -292,11 +255,11 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
                     else:
                         await context.bot.edit_message_text(answer, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
 
-                await asyncio.sleep(0.01)  # wait a bit to avoid flooding
+                await asyncio.sleep(0.01)  # Немного подождем, чтобы избежать спама
 
                 prev_answer = answer
 
-            # update user data
+            # Обновление данных пользователя
             new_dialog_message = {"user": _message, "bot": answer, "date": datetime.now()}
             db.set_dialog_messages(
                 user_id,
@@ -307,7 +270,6 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             db.update_n_used_tokens(user_id, current_model, n_input_tokens, n_output_tokens)
 
         except asyncio.CancelledError:
-            # note: intermediate token updates only work when enable_message_streaming=True (config.yml)
             db.update_n_used_tokens(user_id, current_model, n_input_tokens, n_output_tokens)
             raise
 
@@ -317,7 +279,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             await update.message.reply_text(error_text)
             return
 
-        # send message if some messages were removed from the context
+        # Отправка сообщения, если некоторые сообщения были удалены из контекста
         if n_first_dialog_messages_removed > 0:
             if n_first_dialog_messages_removed == 1:
                 text = "✍️ <i>Note:</i> Your current dialog is too long, so your <b>first message</b> was removed from the context.\n Send /new command to start new dialog"
@@ -339,34 +301,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             if user_id in user_tasks:
                 del user_tasks[user_id]
 
-# Функция tarot_handle
 
-async def tarot_handle(update: Update, context: CallbackContext, message: str):
-    user_id = update.message.from_user.id
-
-    tarot_query = f"Предсказание на картах Таро для запроса: {message}"
-
-    current_model = db.get_user_attribute(user_id, "current_model")
-    chatgpt_instance = openai_utils.ChatGPT(model=current_model)
-    
-    answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed = await chatgpt_instance.send_message(
-        tarot_query,
-        dialog_messages=db.get_dialog_messages(user_id, dialog_id=None),
-        chat_mode="tarot_forecaster"
-    )
-
-    new_dialog_message = {"user": message, "bot": answer, "date": datetime.now()}
-    db.set_dialog_messages(
-        user_id,
-        db.get_dialog_messages(user_id, dialog_id=None) + [new_dialog_message],
-        dialog_id=None
-    )
-
-    db.update_n_used_tokens(user_id, current_model, n_input_tokens, n_output_tokens)
-
-    await update.message.reply_text(answer, parse_mode=ParseMode.HTML)
-
-# Проверяет, не осталось ли необработанных сообщений от пользователя.
 
 async def is_previous_message_not_answered_yet(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -470,158 +405,6 @@ async def cancel_handle(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("<i>Nothing to cancel...</i>", parse_mode=ParseMode.HTML)
 
-# Создает меню выбора режима чата
-
-def get_chat_mode_menu(page_index: int):
-    n_chat_modes_per_page = config.n_chat_modes_per_page
-    text = f"Select <b>chat mode</b> ({len(config.chat_modes)} modes available):"
-
-    # buttons
-    chat_mode_keys = list(config.chat_modes.keys())
-    page_chat_mode_keys = chat_mode_keys[page_index * n_chat_modes_per_page:(page_index + 1) * n_chat_modes_per_page]
-
-    keyboard = []
-    for chat_mode_key in page_chat_mode_keys:
-        name = config.chat_modes[chat_mode_key]["name"]
-        keyboard.append([InlineKeyboardButton(name, callback_data=f"set_chat_mode|{chat_mode_key}")])
-
-    # pagination
-    if len(chat_mode_keys) > n_chat_modes_per_page:
-        is_first_page = (page_index == 0)
-        is_last_page = ((page_index + 1) * n_chat_modes_per_page >= len(chat_mode_keys))
-
-        if is_first_page:
-            keyboard.append([
-                InlineKeyboardButton("»", callback_data=f"show_chat_modes|{page_index + 1}")
-            ])
-        elif is_last_page:
-            keyboard.append([
-                InlineKeyboardButton("«", callback_data=f"show_chat_modes|{page_index - 1}"),
-            ])
-        else:
-            keyboard.append([
-                InlineKeyboardButton("«", callback_data=f"show_chat_modes|{page_index - 1}"),
-                InlineKeyboardButton("»", callback_data=f"show_chat_modes|{page_index + 1}")
-            ])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    return text, reply_markup
-
-# Показывает меню выбора режима чата
-
-async def show_chat_modes_handle(update: Update, context: CallbackContext):
-    await register_user_if_not_exists(update, context, update.message.from_user)
-    if await is_previous_message_not_answered_yet(update, context): return
-
-    user_id = update.message.from_user.id
-    db.set_user_attribute(user_id, "last_interaction", datetime.now())
-
-    text, reply_markup = get_chat_mode_menu(0)
-    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-
-# Обрабатывает выбор режима чата
-
-async def show_chat_modes_callback_handle(update: Update, context: CallbackContext):
-     await register_user_if_not_exists(update.callback_query, context, update.callback_query.from_user)
-     if await is_previous_message_not_answered_yet(update.callback_query, context): return
-
-     user_id = update.callback_query.from_user.id
-     db.set_user_attribute(user_id, "last_interaction", datetime.now())
-
-     query = update.callback_query
-     await query.answer()
-
-     page_index = int(query.data.split("|")[1])
-     if page_index < 0:
-         return
-
-     text, reply_markup = get_chat_mode_menu(page_index)
-     try:
-         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-     except telegram.error.BadRequest as e:
-         if str(e).startswith("Message is not modified"):
-             pass
-
-# Устанавливает выбранный режим чата
-
-async def set_chat_mode_handle(update: Update, context: CallbackContext):
-    await register_user_if_not_exists(update.callback_query, context, update.callback_query.from_user)
-    user_id = update.callback_query.from_user.id
-
-    query = update.callback_query
-    await query.answer()
-
-    chat_mode = query.data.split("|")[1]
-
-    db.set_user_attribute(user_id, "current_chat_mode", chat_mode)
-    db.start_new_dialog(user_id)
-
-    await context.bot.send_message(
-        update.callback_query.message.chat.id,
-        f"{config.chat_modes[chat_mode]['welcome_message']}",
-        parse_mode=ParseMode.HTML
-    )
-
-# Создает меню настроек
-
-def get_settings_menu(user_id: int):
-    current_model = db.get_user_attribute(user_id, "current_model")
-    text = config.models["info"][current_model]["description"]
-
-    text += "\n\n"
-    score_dict = config.models["info"][current_model]["scores"]
-    for score_key, score_value in score_dict.items():
-        text += "🟢" * score_value + "⚪️" * (5 - score_value) + f" – {score_key}\n\n"
-
-    text += "\nSelect <b>model</b>:"
-
-    # buttons to choose models
-    buttons = []
-    for model_key in config.models["available_text_models"]:
-        title = config.models["info"][model_key]["name"]
-        if model_key == current_model:
-            title = "✅ " + title
-
-        buttons.append(
-            InlineKeyboardButton(title, callback_data=f"set_settings|{model_key}")
-        )
-    reply_markup = InlineKeyboardMarkup([buttons])
-
-    return text, reply_markup
-
-# Показывает меню настроек
-
-async def settings_handle(update: Update, context: CallbackContext):
-    await register_user_if_not_exists(update, context, update.message.from_user)
-    if await is_previous_message_not_answered_yet(update, context): return
-
-    user_id = update.message.from_user.id
-    db.set_user_attribute(user_id, "last_interaction", datetime.now())
-
-    text, reply_markup = get_settings_menu(user_id)
-    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-
-# Обрабатывает выбор модели в настройках.
-
-async def set_settings_handle(update: Update, context: CallbackContext):
-    await register_user_if_not_exists(update.callback_query, context, update.callback_query.from_user)
-    user_id = update.callback_query.from_user.id
-
-    query = update.callback_query
-    await query.answer()
-
-    _, model_key = query.data.split("|")
-    db.set_user_attribute(user_id, "current_model", model_key)
-    db.start_new_dialog(user_id)
-
-    text, reply_markup = get_settings_menu(user_id)
-    try:
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-    except telegram.error.BadRequest as e:
-        if str(e).startswith("Message is not modified"):
-            pass
-
 # Показывает баланс пользователя
 
 async def show_balance_handle(update: Update, context: CallbackContext):
@@ -709,10 +492,8 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 async def post_init(application: Application):
     await application.bot.set_my_commands([
         BotCommand("/new", "Start new dialog"),
-        BotCommand("/mode", "Select chat modo"),
         BotCommand("/retry", "Re-generate response for previous query"),
         BotCommand("/balance", "Show balance"),
-        BotCommand("/settings", "Show settings"),
         BotCommand("/help", "Show help message"),
     ])
 
@@ -741,7 +522,6 @@ def run_bot() -> None:
 
     application.add_handler(CommandHandler("start", start_handle, filters=user_filter))
     application.add_handler(CommandHandler("help", help_handle, filters=user_filter))
-    application.add_handler(CommandHandler("help_group_chat", help_group_chat_handle, filters=user_filter))
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & user_filter, message_handle))
     application.add_handler(CommandHandler("retry", retry_handle, filters=user_filter))
@@ -750,12 +530,6 @@ def run_bot() -> None:
 
     application.add_handler(MessageHandler(filters.VOICE & user_filter, voice_message_handle))
 
-    application.add_handler(CommandHandler("mode", show_chat_modes_handle, filters=user_filter))
-    application.add_handler(CallbackQueryHandler(show_chat_modes_callback_handle, pattern="^show_chat_modes"))
-    application.add_handler(CallbackQueryHandler(set_chat_mode_handle, pattern="^set_chat_mode"))
-
-    application.add_handler(CommandHandler("settings", settings_handle, filters=user_filter))
-    application.add_handler(CallbackQueryHandler(set_settings_handle, pattern="^set_settings"))
 
     application.add_handler(CommandHandler("balance", show_balance_handle, filters=user_filter))
 
