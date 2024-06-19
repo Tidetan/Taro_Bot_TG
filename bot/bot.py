@@ -26,6 +26,7 @@ from telegram.ext import (
     filters
 )
 from telegram.constants import ParseMode, ChatAction
+from bot.tarot_utils import get_daily_tarot_card
 
 import config
 import database
@@ -39,13 +40,15 @@ logger = logging.getLogger(__name__)
 user_semaphores = {}
 user_tasks = {}
 
-HELP_MESSAGE = """Commands:
-⚪ /retry – Regenerate last bot answer
-⚪ /new – Start new dialog
-⚪ /balance – Show balance
-⚪ /help – Show help
+HELP_MESSAGE = """Команды:
 
-🎤 You can send <b>Voice Messages</b> instead of text
+⚪ /new – Начать новый чат
+⚪ /retry – Повторно сгенерировать последний ответ
+⚪ /balance – Показать баланс
+⚪ /cancel – Отменяет последнее сообщение если долго создается
+⚪ /help – Показать команды
+
+🎤 Ты можешь отправить <b>голосовое сообщение</b> вместо текста!
 
 """
 
@@ -102,27 +105,6 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
         db.set_user_attribute(user.id, "n_generated_images", 0)
 
 
-
-# Проверяет, упоминался ли бот в сообщении 
-
-async def is_bot_mentioned(update: Update, context: CallbackContext):
-     try:
-         message = update.message
-
-         if message.chat.type == "private":
-             return True
-
-         if message.text is not None and ("@" + context.bot.username) in message.text:
-             return True
-
-         if message.reply_to_message is not None:
-             if message.reply_to_message.from_user.id == context.bot.id:
-                 return True
-     except:
-         return True
-     else:
-         return False
-
 # Обрабатывает команду /start
 
 async def start_handle(update: Update, context: CallbackContext):
@@ -166,22 +148,13 @@ async def retry_handle(update: Update, context: CallbackContext):
     await message_handle(update, context, message=last_dialog_message["user"], use_new_dialog_timeout=False)
 
 # Обрабатывает входящие сообщения.
-
 async def message_handle(update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True):
-    # Проверка, упомянут ли бот (для групповых чатов)
-    if not await is_bot_mentioned(update, context):
-        return
-
     # Проверка, было ли сообщение отредактировано
     if update.edited_message is not None:
         await edited_message_handle(update, context)
         return
 
     _message = message or update.message.text
-
-    # Удаление упоминания бота (в групповых чатах)
-    if update.message.chat.type != "private":
-        _message = _message.replace("@" + context.bot.username, "").strip()
 
     # Регистрация пользователя и проверка предыдущих сообщений
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -190,28 +163,25 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
 
     user_id = update.message.from_user.id
 
-    # Обработка режима чата "tarot_forecaster"
+    # Обработка сообщения
     async def message_handle_fn():
         # Новый диалог по таймауту
         if use_new_dialog_timeout:
             if (datetime.now() - db.get_user_attribute(user_id, "last_interaction")).seconds > config.new_dialog_timeout and len(db.get_dialog_messages(user_id)) > 0:
                 db.start_new_dialog(user_id)
-                await update.message.reply_text(f"Starting new dialog due to timeout (<b>{config.chat_modes['tarot_forecaster']['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
+                await update.message.reply_text(f"Начинаем новый диалог из-за таймаута (<b>{config.chat_modes['tarot_forecaster']['name']}</b> режим) ✅", parse_mode=ParseMode.HTML)
         db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
-        # В случае ошибки CancelledError
         n_input_tokens, n_output_tokens = 0, 0
         current_model = db.get_user_attribute(user_id, "current_model")
 
         try:
-            # Отправка временного сообщения пользователю
             placeholder_message = await update.message.reply_text("...")
 
-            # Отправка действия "typing"
             await update.message.chat.send_action(action="typing")
 
             if _message is None or len(_message) == 0:
-                await update.message.reply_text("🥲 You sent <b>empty message</b>. Please, try again!", parse_mode=ParseMode.HTML)
+                await update.message.reply_text("🥲 Вы отправили <b>пустое сообщение</b>. Пожалуйста, попробуйте снова!", parse_mode=ParseMode.HTML)
                 return
 
             dialog_messages = db.get_dialog_messages(user_id, dialog_id=None)
@@ -243,7 +213,6 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
 
                 answer = answer[:4096]  # Лимит сообщения в Telegram
 
-                # Обновление только при готовности 100 новых символов
                 if abs(len(answer) - len(prev_answer)) < 100 and status != "finished":
                     continue
 
@@ -255,11 +224,10 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
                     else:
                         await context.bot.edit_message_text(answer, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
 
-                await asyncio.sleep(0.01)  # Немного подождем, чтобы избежать спама
+                await asyncio.sleep(0.01)
 
                 prev_answer = answer
 
-            # Обновление данных пользователя
             new_dialog_message = {"user": _message, "bot": answer, "date": datetime.now()}
             db.set_dialog_messages(
                 user_id,
@@ -274,17 +242,16 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             raise
 
         except Exception as e:
-            error_text = f"Something went wrong during completion. Reason: {e}"
+            error_text = f"Произошла ошибка во время выполнения. Причина: {e}"
             logger.error(error_text)
             await update.message.reply_text(error_text)
             return
 
-        # Отправка сообщения, если некоторые сообщения были удалены из контекста
         if n_first_dialog_messages_removed > 0:
             if n_first_dialog_messages_removed == 1:
-                text = "✍️ <i>Note:</i> Your current dialog is too long, so your <b>first message</b> was removed from the context.\n Send /new command to start new dialog"
+                text = "✍️ <i>Примечание:</i> Ваш текущий диалог слишком длинный, поэтому ваше <b>первое сообщение</b> было удалено из контекста.\n Отправьте команду /new для начала нового диалога"
             else:
-                text = f"✍️ <i>Note:</i> Your current dialog is too long, so <b>{n_first_dialog_messages_removed} first messages</b> were removed from the context.\n Send /new command to start new dialog"
+                text = f"✍️ <i>Примечание:</i> Ваш текущий диалог слишком длинный, поэтому <b>{n_first_dialog_messages_removed} первых сообщений</b> были удалены из контекста.\n Отправьте команду /new для начала нового диалога"
             await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
     async with user_semaphores[user_id]:
@@ -294,9 +261,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
         try:
             await task
         except asyncio.CancelledError:
-            await update.message.reply_text("✅ Canceled", parse_mode=ParseMode.HTML)
-        else:
-            pass
+            await update.message.reply_text("✅ Отменено", parse_mode=ParseMode.HTML)
         finally:
             if user_id in user_tasks:
                 del user_tasks[user_id]
@@ -308,8 +273,8 @@ async def is_previous_message_not_answered_yet(update: Update, context: Callback
 
     user_id = update.message.from_user.id
     if user_semaphores[user_id].locked():
-        text = "⏳ Please <b>wait</b> for a reply to the previous message\n"
-        text += "Or you can /cancel it"
+        text = "⏳ Пожалуйста <b>подождите</b> дождитесь ответ на предыдущее сообщение\n"
+        text += "Или вы можете отменить его использовав /cancel"
         await update.message.reply_text(text, reply_to_message_id=update.message.id, parse_mode=ParseMode.HTML)
         return True
     else:
@@ -318,10 +283,6 @@ async def is_previous_message_not_answered_yet(update: Update, context: Callback
 # Обрабатывает голосовые сообщения
 
 async def voice_message_handle(update: Update, context: CallbackContext):
-    # check if bot was mentioned (for group chats)
-    if not await is_bot_mentioned(update, context):
-        return
-
     await register_user_if_not_exists(update, context, update.message.from_user)
     if await is_previous_message_not_answered_yet(update, context): return
 
@@ -378,6 +339,7 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
 
 # Начинает новый диалог
 
+# Начинает новый диалог
 async def new_dialog_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
     if await is_previous_message_not_answered_yet(update, context): return
@@ -386,10 +348,34 @@ async def new_dialog_handle(update: Update, context: CallbackContext):
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
     db.start_new_dialog(user_id)
-    await update.message.reply_text("Starting new dialogo ✅")
-
+    
     chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
-    await update.message.reply_text(f"{config.chat_modes[chat_mode]['welcome_message']}", parse_mode=ParseMode.HTML)
+    welcome_message = config.chat_modes[chat_mode]['welcome_message']
+
+    # Создаем инлайн-кнопку
+    keyboard = [
+        [InlineKeyboardButton("Карта дня", callback_data='daily_card')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(welcome_message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
+# Обрабатывает нажатие на инлайн-кнопку
+async def button_handle(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == 'daily_card':
+        await generate_daily_card(query, context)
+
+# Генерирует карту дня
+async def generate_daily_card(query, context):
+    user_id = query.from_user.id
+    card = get_daily_tarot_card()
+    card_description = f"Ваша карта дня: <b>{card['name']}</b>\n{card['description']}"
+
+    await query.edit_message_text(card_description, parse_mode=ParseMode.HTML)
+
 
 # Отменяет текущую задачу
 
@@ -403,7 +389,7 @@ async def cancel_handle(update: Update, context: CallbackContext):
         task = user_tasks[user_id]
         task.cancel()
     else:
-        await update.message.reply_text("<i>Nothing to cancel...</i>", parse_mode=ParseMode.HTML)
+        await update.message.reply_text("<i>Нечего отменять сообщение уже сгенерировалось...</i>", parse_mode=ParseMode.HTML)
 
 # Показывает баланс пользователя
 
@@ -491,10 +477,11 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 
 async def post_init(application: Application):
     await application.bot.set_my_commands([
-        BotCommand("/new", "Start new dialog"),
-        BotCommand("/retry", "Re-generate response for previous query"),
-        BotCommand("/balance", "Show balance"),
-        BotCommand("/help", "Show help message"),
+        BotCommand("/new", "Начать новый чат"),
+        BotCommand("/retry", "Повторно сгенерировать последний ответ"),
+        BotCommand("/balance", "Показать баланс"),
+        BotCommand("/help", "Показать команды"),
+        BotCommand("/cancel", "Отменяет последнее сообщение если долго создается")
     ])
 
 # Запускает бота
@@ -532,6 +519,7 @@ def run_bot() -> None:
 
 
     application.add_handler(CommandHandler("balance", show_balance_handle, filters=user_filter))
+    application.add_handler(CallbackQueryHandler(button_handle, pattern='daily_card'))
 
     application.add_error_handler(error_handle)
 
