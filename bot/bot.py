@@ -26,7 +26,7 @@ from telegram.ext import (
     filters
 )
 from telegram.constants import ParseMode, ChatAction
-from tarot_utils import get_daily_tarot_card
+from tarot_utils import get_daily_tarot_card,get_tarot_card_by_birthdate
 
 import config
 import database
@@ -81,7 +81,7 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
     if db.get_user_attribute(user.id, "current_model") is None:
         db.set_user_attribute(user.id, "current_model", config.models["available_text_models"][0])
 
-        # Set default chat mode to tarot_forecaster
+    # Set default chat mode to tarot_forecaster
     if db.get_user_attribute(user.id, "current_chat_mode") is None:
         db.set_user_attribute(user.id, "current_chat_mode", "tarot_forecaster")
 
@@ -103,6 +103,10 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
     # image generation
     if db.get_user_attribute(user.id, "n_generated_images") is None:
         db.set_user_attribute(user.id, "n_generated_images", 0)
+
+    # track user state
+    if 'state' not in context.user_data:
+        context.user_data['state'] = None
 
 
 # Обрабатывает команду /start
@@ -147,8 +151,38 @@ async def retry_handle(update: Update, context: CallbackContext):
 
     await message_handle(update, context, message=last_dialog_message["user"], use_new_dialog_timeout=False)
 
+# Обрабатывает нажатие на инлайн-кнопку
+async def button_handle(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == 'daily_card':
+        context.user_data['state'] = 'awaiting_birthdate'
+        await query.message.reply_text("Пожалуйста, введите свою дату и время рождения в формате ГГГГ-ММ-ДД ЧЧ:ММ")
+
+# Обрабатывает сообщения с датой и временем рождения
+async def birthdate_handle(update: Update, context: CallbackContext):
+    if context.user_data.get('state') == 'awaiting_birthdate':
+        user_id = update.message.from_user.id
+        birthdate_str = update.message.text
+
+        try:
+            card = get_tarot_card_by_birthdate(birthdate_str)
+            card_description = f"Ваша карта на основе даты рождения: <b>{card['name']}</b>\n{card['description']}"
+            await update.message.reply_photo(photo=open(card['image'], 'rb'), caption=card_description, parse_mode=ParseMode.HTML)
+            context.user_data['state'] = None
+        except ValueError:
+            await update.message.reply_text("Неверный формат даты. Пожалуйста, используйте формат ГГГГ-ММ-ДД ЧЧ:ММ")
+
 # Обрабатывает входящие сообщения.
 async def message_handle(update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True):
+
+    # Проверка, была ли введена да и время рождения
+
+    if context.user_data.get('state') == 'awaiting_birthdate':
+        await birthdate_handle(update, context)
+        return
+
     # Проверка, было ли сообщение отредактировано
     if update.edited_message is not None:
         await edited_message_handle(update, context)
@@ -358,29 +392,6 @@ async def new_dialog_handle(update: Update, context: CallbackContext):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(welcome_message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
-
-# Обрабатывает нажатие на инлайн-кнопку
-async def button_handle(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == 'daily_card':
-        await query.message.reply_text("Пожалуйста, введите свою дату и время рождения в формате ГГГГ-ММ-ДД ЧЧ:ММ")
-        return
-    
-    await query.message.reply_text("Неверный запрос")
-
-# Обрабатывает сообщения с датой и временем рождения
-async def birthdate_handle(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    birthdate_str = update.message.text
-
-    try:
-        card = get_tarot_card_by_birthdate(birthdate_str)
-        card_description = f"Ваша карта на основе даты рождения: <b>{card['name']}</b>\n{card['description']}"
-        await update.message.reply_text(card_description, parse_mode=ParseMode.HTML)
-    except ValueError:
-        await update.message.reply_text("Неверный формат даты. Пожалуйста, используйте формат ГГГГ-ММ-ДД ЧЧ:ММ")
 
 
 # Генерирует карту дня
