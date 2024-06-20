@@ -26,7 +26,7 @@ from telegram.ext import (
     filters
 )
 from telegram.constants import ParseMode, ChatAction
-from bot.tarot_utils import get_daily_tarot_card
+from tarot_utils import get_daily_tarot_card
 
 import config
 import database
@@ -337,7 +337,6 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
         await update.message.chat.send_action(action="upload_photo")
         await update.message.reply_photo(image_url, parse_mode=ParseMode.HTML)
 
-# Начинает новый диалог
 
 # Начинает новый диалог
 async def new_dialog_handle(update: Update, context: CallbackContext):
@@ -366,7 +365,23 @@ async def button_handle(update: Update, context: CallbackContext):
     await query.answer()
 
     if query.data == 'daily_card':
-        await generate_daily_card(query, context)
+        await query.message.reply_text("Пожалуйста, введите свою дату и время рождения в формате ГГГГ-ММ-ДД ЧЧ:ММ")
+        return
+    
+    await query.message.reply_text("Неверный запрос")
+
+# Обрабатывает сообщения с датой и временем рождения
+async def birthdate_handle(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    birthdate_str = update.message.text
+
+    try:
+        card = get_tarot_card_by_birthdate(birthdate_str)
+        card_description = f"Ваша карта на основе даты рождения: <b>{card['name']}</b>\n{card['description']}"
+        await update.message.reply_text(card_description, parse_mode=ParseMode.HTML)
+    except ValueError:
+        await update.message.reply_text("Неверный формат даты. Пожалуйста, используйте формат ГГГГ-ММ-ДД ЧЧ:ММ")
+
 
 # Генерирует карту дня
 async def generate_daily_card(query, context):
