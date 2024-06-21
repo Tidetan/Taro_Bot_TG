@@ -26,7 +26,7 @@ class ChatGPT:
                          "gpt-4", "gpt-4-1106-preview"}, f"Unknown model: {model}"
         self.model = model
 
-    async def send_message(self, message, dialog_messages=[], chat_mode="assistant"):
+    async def send_message(self, message, dialog_messages=[], chat_mode="tarot_forecaster"):
         if chat_mode not in config.chat_modes.keys():
             raise ValueError(f"Chat mode {chat_mode} is not supported")
 
@@ -70,7 +70,7 @@ class ChatGPT:
 
         return answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed
 
-    async def send_message_stream(self, message, dialog_messages=[], chat_mode="assistant"):
+    async def send_message_stream(self, message, dialog_messages=[], chat_mode="tarot_forecaster"):
         if chat_mode not in config.chat_modes.keys():
             raise ValueError(f"Chat mode {chat_mode} is not supported")
 
