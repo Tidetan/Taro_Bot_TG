@@ -383,7 +383,7 @@ async def new_dialog_handle(update: Update, context: CallbackContext):
     db.start_new_dialog(user_id)
     
     chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
-    welcome_message = config.chat_modes[chat_mode]['welcome_message']
+    welcome_message = config.chat_modes[chat_mode]['welcome_message'] 
 
     # Создаем инлайн-кнопку
     keyboard = [
