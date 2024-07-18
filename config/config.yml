@@ -1,5 +1,5 @@
-telegram_token: "6668953055:AAGYCMXa7PR2gqA5c6ynVbR0GT65fK3GeRg"
-openai_api_key: "sk-proj-oT8WJBQxbuDvWbBRte7dT3BlbkFJv4PLwoFDlP4wYO0huPhP"
+telegram_token: "token"
+openai_api_key: "token"
 openai_api_base: null  # leave null to use default api base or you can put your own base url here
 
 
