@@ -20,11 +20,11 @@
 Для более детального обзора просмотрите readme автора https://github.com/yesbhautik/Master-AI-BOT/blob/main/README.md
 
 
-##Tarot Fortune Teller
+## Tarot Fortune Teller
 
 Here is my script, which I borrowed from another GitHub repository to modify for my own needs. Currently, the bot can converse like a Tarot fortune teller using the GPT 3.5 engine and provides a random card of the day.
 
-##Main Commands
+## Main Commands
 
 🔮 /new – Start a new Tarot reading
 
@@ -34,7 +34,7 @@ Here is my script, which I borrowed from another GitHub repository to modify for
 
 ❓ /help – Show commands
 
-##Additionally
+## Additionally
 
 The bot can remember the dialogue (but if you don't write for a long time, the bot simply resets the dialogue due to the long period of inactivity).
 In short, if you find it useful, feel free to use it.
